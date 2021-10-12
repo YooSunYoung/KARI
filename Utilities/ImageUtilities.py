@@ -58,10 +58,10 @@ def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=No
 
 
 if __name__ == "__main__":
-    sample_large_image = cv2.imread('./sample.jpeg')
-    # sample_large_image = np.random.rand(800, 1200, 3)*100
+    # sample_large_image = cv2.imread('./sample.jpeg')
+    sample_large_image = np.random.rand(3200, 4500, 3)*100/255
     row_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-    target_size = np.array([800, 800])
+    target_size = np.array([512, 512])
     overlap_size = np.array([30, 50])
     split_images = split_2d_image(sample_large_image, target_size, overlap_size)
     for i_row, offset_row in enumerate(split_images['offsets']):
