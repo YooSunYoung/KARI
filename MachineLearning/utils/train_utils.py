@@ -1,17 +1,11 @@
 import tensorflow as tf
 import math
-from utils import bbox_utils
+from MachineLearning.utils import bbox_utils
 
 RPN = {
     "vgg16": {
         "img_size": 500,
         "feature_map_shape": 31,
-        "anchor_ratios": [1., 2., 1./2.],
-        "anchor_scales": [128, 256, 512],
-    },
-    "mobilenet_v2": {
-        "img_size": 500,
-        "feature_map_shape": 32,
         "anchor_ratios": [1., 2., 1./2.],
         "anchor_scales": [128, 256, 512],
     }
@@ -193,6 +187,7 @@ def rpn_cls_loss(*args):
     output = tf.gather_nd(y_pred, indices)
     lf = tf.losses.BinaryCrossentropy()
     return lf(target, output)
+
 
 def reg_loss(*args):
     """Calculating rpn / faster rcnn regression loss value.

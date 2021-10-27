@@ -2,6 +2,7 @@ import numpy as np
 import logging
 from math import ceil, floor
 import cv2
+from tqdm import tqdm
 
 
 def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=None,
@@ -40,7 +41,7 @@ def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=No
         num_rows = ceil((raw_image_y_size-target_y_size)/y_interval)+1
     left_upper_coordinates = []
     cropped_images = []
-    for i_row in range(num_rows+1):
+    for i_row in tqdm(range(num_rows+1)):
         row_coord = []
         row_image = []
         y_offset = i_row*y_interval
@@ -55,6 +56,35 @@ def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=No
         left_upper_coordinates.append(row_coord)
         cropped_images.append(row_image)
     return {"images": cropped_images, "offsets": left_upper_coordinates}
+
+
+def crop_image(large_image: np.ndarray, original_labels: np.ndarray,
+               cropped_image_width=2048, cropped_image_height=2048):
+    """
+    Crop images into small pieces
+    :param large_image: an image you want to split into small pieces
+    :param original_labels: object labels on the `large_image`
+    :param cropped_image_width: target width of each piece
+    :param cropped_image_height: target height of each piece
+    :return: cropped_images, labels, split_images['offsets']
+    """
+    target_size = np.array([cropped_image_height, cropped_image_width])
+    split_images = split_2d_image(large_image, target_size)
+    cropped_images = split_images['images']
+    labels = []
+    for i_row, offset_row in tqdm(enumerate(split_images['offsets'])):
+        row_labels = []
+        for offset in offset_row:
+            image_labels = []
+            for x, y, obj_size, cls in original_labels:
+                if (offset[0] <= x <= offset[0] + cropped_image_width) \
+                        and (offset[1] <= y <= offset[1] + cropped_image_height):
+                    x -= offset[0]
+                    y -= offset[1]
+                    image_labels.append((x, y, obj_size, obj_size, cls))
+            row_labels.append(image_labels)
+        labels.extend(row_labels)
+    return cropped_images, labels, split_images['offsets']
 
 
 if __name__ == "__main__":

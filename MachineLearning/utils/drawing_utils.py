@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 from utils import bbox_utils
 
+
 def draw_grid_map(img, grid_map, stride):
     """Drawing grid intersection on given image.
     inputs:
@@ -27,6 +28,7 @@ def draw_grid_map(img, grid_map, stride):
     plt.imshow(image)
     plt.show()
 
+
 def draw_bboxes(imgs, bboxes):
     """Drawing bounding boxes on given images.
     inputs:
@@ -40,6 +42,7 @@ def draw_bboxes(imgs, bboxes):
     for img_with_bb in imgs_with_bb:
         plt.imshow(img_with_bb)
         plt.show()
+
 
 def draw_bboxes_with_labels(img, bboxes, label_indices, probs, labels):
     """Drawing bounding boxes with labels on given image.

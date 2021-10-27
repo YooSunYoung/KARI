@@ -8,6 +8,12 @@ import spectral.io.envi as envi
 import pandas as pd
 
 
+def get_dataset(dir='../data/resized_cropped_raw', prefix='cropped_resized_debug_raw', image_num=0):
+    images = np.load(os.path.join(dir, '{}_images_{}.npy'.format(prefix, image_num)))
+    labels = np.load(os.path.join(dir, '{}_labels_{}.npy'.format(prefix, image_num)), allow_pickle=True)
+    return images, labels
+
+
 def get_dirs(root_dir="D:/20210517", debug=False):
     region_dirs = os.listdir(root_dir)
     region_dirs = [os.path.join(root_dir, x) for x in region_dirs
@@ -66,13 +72,22 @@ def get_target_csv(target_dir):
     return None
 
 
-def get_target_files(region_period_dirs: dict):
+def get_target_files(region_period_dirs: dict, save_removed=True, removed_dir_path='../data/removed_dirs.json'):
+    removed = dict()
     for region in region_period_dirs:
+        removed[region] = dict()
         for period_prefix in region_period_dirs[region]:
+            if 'L1A' not in region_period_dirs[region][period_prefix]:
+                continue
             target_dir_items = parse_target_dir(region_period_dirs[region][period_prefix]['L1A'])
+            if 'TARGET_DIR' not in target_dir_items:
+                continue
             region_period_dirs[region][period_prefix].update(target_dir_items)
             target_csv = get_target_csv(target_dir_items['TARGET_DIR'])
             region_period_dirs[region][period_prefix]['TARGET_CSV'] = target_csv
+    if save_removed:
+        with open(removed_dir_path, 'w') as f:
+            json.dump(removed, f, indent='\t')
     return region_period_dirs
 
 
@@ -97,5 +112,4 @@ def get_image_rgb(image_path):
 
 def get_label(csv_path):
     return pd.read_csv(csv_path)
-
 
