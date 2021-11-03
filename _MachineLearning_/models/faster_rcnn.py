@@ -1,15 +1,7 @@
 import tensorflow as tf
-import numpy as np
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Layer, Lambda, Input, Conv2D, TimeDistributed, Dense, Flatten, BatchNormalization, Dropout, AveragePooling2D
-from MachineLearning.utils import bbox_utils, train_utils
-
-
-def resize_input_image(images: np.ndarray):
-    input_image = Input(shape=images.shape)
-    input_image = AveragePooling2D(pool_size=(2, 2), strides=(1, 1))
-    input_image = AveragePooling2D(pool_size=(2, 2), strides=(1, 1))
-    return input_image
+from tensorflow.keras.layers import Layer, Lambda, Input, TimeDistributed, Dense, Flatten, Dropout
+from MachineLearning.utils import train_utils, bbox_utils
 
 
 class Decoder(Layer):
@@ -66,6 +58,7 @@ class Decoder(Layer):
         #
         return final_bboxes, final_labels, final_scores
 
+
 class RoIBBox(Layer):
     """Generating bounding boxes from rpn predictions.
     First calculating the boxes from predicted deltas and label probs.
@@ -115,11 +108,12 @@ class RoIBBox(Layer):
         pre_roi_labels = tf.reshape(pre_roi_labels, (batch_size, pre_nms_topn, 1))
         #
         roi_bboxes, _, _, _ = bbox_utils.non_max_suppression(pre_roi_bboxes, pre_roi_labels,
-                                                          max_output_size_per_class=post_nms_topn,
-                                                          max_total_size=post_nms_topn,
-                                                          iou_threshold=nms_iou_threshold)
+                                                             max_output_size_per_class=post_nms_topn,
+                                                             max_total_size=post_nms_topn,
+                                                             iou_threshold=nms_iou_threshold)
         #
         return tf.stop_gradient(roi_bboxes)
+
 
 class RoIDelta(Layer):
     """Calculating faster rcnn actual bounding box deltas and labels.
@@ -181,6 +175,7 @@ class RoIDelta(Layer):
         #
         return tf.stop_gradient(roi_bbox_deltas), tf.stop_gradient(roi_bbox_labels)
 
+
 class RoIPooling(Layer):
     """Reducing all feature maps to same size.
     Firstly cropping bounding boxes from the feature maps and then resizing it to the pooling size.
@@ -221,6 +216,7 @@ class RoIPooling(Layer):
         )
         final_pooling_feature_map = tf.reshape(pooling_feature_map, (batch_size, total_bboxes, pooling_feature_map.shape[1], pooling_feature_map.shape[2], pooling_feature_map.shape[3]))
         return final_pooling_feature_map
+
 
 def get_model(feature_extractor, rpn_model, anchors, hyper_params, mode="training"):
     """Generating rpn model for given backbone base model and hyper params.

@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 def generate_base_anchors(hyper_params):
     """Generating top left anchors for given anchor_ratios, anchor_scales and image size values.
     inputs:
@@ -18,6 +19,7 @@ def generate_base_anchors(hyper_params):
             h = w * ratio
             base_anchors.append([-h / 2, -w / 2, h / 2, w / 2])
     return tf.cast(base_anchors, dtype=tf.float32)
+
 
 def generate_anchors(hyper_params):
     """Broadcasting base_anchors and generating all anchors for given image parameters.
@@ -43,6 +45,7 @@ def generate_anchors(hyper_params):
     anchors = tf.reshape(anchors, (-1, 4))
     return tf.clip_by_value(anchors, 0, 1)
 
+
 def non_max_suppression(pred_bboxes, pred_labels, **kwargs):
     """Applying non maximum suppression.
     Details could be found on tensorflow documentation.
@@ -65,6 +68,7 @@ def non_max_suppression(pred_bboxes, pred_labels, **kwargs):
         pred_labels,
         **kwargs
     )
+
 
 def get_bboxes_from_deltas(anchors, deltas):
     """Calculating bounding boxes for given bounding box and delta values.
@@ -95,7 +99,7 @@ def get_deltas_from_bboxes(bboxes, gt_boxes):
     """Calculating bounding box deltas for given bounding box and ground truth boxes.
     inputs:
         bboxes = (batch_size, total_bboxes, [y1, x1, y2, x2])
-        gt_boxes = (batch_size, total_bboxes, [y1, x1, y2, x2])
+        gt_boxes = (batch_size, total_bboxes, [cx, cy, w, h])
     outputs:
         final_deltas = (batch_size, total_bboxes, [delta_y, delta_x, delta_h, delta_w])
     """
@@ -108,6 +112,10 @@ def get_deltas_from_bboxes(bboxes, gt_boxes):
     gt_height = gt_boxes[..., 2] - gt_boxes[..., 0]
     gt_ctr_x = gt_boxes[..., 1] + 0.5 * gt_width
     gt_ctr_y = gt_boxes[..., 0] + 0.5 * gt_height
+    # gt_width = gt_boxes[..., 2]
+    # gt_height = gt_boxes[..., 3]
+    # gt_ctr_x = gt_boxes[..., 0]
+    # gt_ctr_y = gt_boxes[..., 1]
     #
     bbox_width = tf.where(tf.equal(bbox_width, 0), 1e-3, bbox_width)
     bbox_height = tf.where(tf.equal(bbox_height, 0), 1e-3, bbox_height)
@@ -118,11 +126,12 @@ def get_deltas_from_bboxes(bboxes, gt_boxes):
     #
     return tf.stack([delta_y, delta_x, delta_h, delta_w], axis=-1)
 
+
 def generate_iou_map(bboxes, gt_boxes):
     """Calculating iou values for each ground truth boxes in batched manner.
     inputs:
         bboxes = (batch_size, total_bboxes, [y1, x1, y2, x2])
-        gt_boxes = (batch_size, total_gt_boxes, [y1, x1, y2, x2])
+        gt_boxes = (batch_size, total_gt_boxes, [cx, cy, w, h])
     outputs:
         iou_map = (batch_size, total_bboxes, total_gt_boxes)
     """
@@ -143,6 +152,7 @@ def generate_iou_map(bboxes, gt_boxes):
     # Intersection over Union
     return intersection_area / union_area
 
+
 def normalize_bboxes(bboxes, height, width):
     """Normalizing bounding boxes.
     inputs:
@@ -158,6 +168,7 @@ def normalize_bboxes(bboxes, height, width):
     y2 = bboxes[..., 2] / height
     x2 = bboxes[..., 3] / width
     return tf.stack([y1, x1, y2, x2], axis=-1)
+
 
 def denormalize_bboxes(bboxes, height, width):
     """Denormalizing bounding boxes.

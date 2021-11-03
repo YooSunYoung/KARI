@@ -1,10 +1,8 @@
 import os
 import tensorflow as tf
-from tensorflow.python.data import Dataset
 import tensorflow_datasets as tfds
 from PIL import Image
 import numpy as np
-
 
 def preprocessing(image_data, final_height, final_width, apply_augmentation=False, evaluate=False):
     """Image resizing operation handled before batch operations.
@@ -18,21 +16,17 @@ def preprocessing(image_data, final_height, final_width, apply_augmentation=Fals
         gt_labels = (gt_box_size)
     """
     img = image_data["image"]
-    if img.shape[-1] == 4:
-        img = img[:, :, :3]
     gt_boxes = image_data["objects"]["bbox"]
     gt_labels = tf.cast(image_data["objects"]["label"] + 1, tf.int32)
     if evaluate:
         not_diff = tf.logical_not(image_data["objects"]["is_difficult"])
         gt_boxes = gt_boxes[not_diff]
         gt_labels = gt_labels[not_diff]
-    img = np.asarray(img).astype('float32')
     img = tf.image.convert_image_dtype(img, tf.float32)
     img = tf.image.resize(img, (final_height, final_width))
     if apply_augmentation:
         img, gt_boxes = randomly_apply_operation(flip_horizontally, img, gt_boxes)
     return img, gt_boxes, gt_labels
-
 
 def get_random_bool():
     """Generating random boolean.
@@ -73,7 +67,6 @@ def flip_horizontally(img, gt_boxes):
                                 1.0 - gt_boxes[..., 1]], -1)
     return flipped_img, flipped_gt_boxes
 
-
 def get_dataset(name, split, data_dir="~/tensorflow_datasets"):
     """Get tensorflow dataset split and info.
     inputs:
@@ -87,41 +80,6 @@ def get_dataset(name, split, data_dir="~/tensorflow_datasets"):
     assert split in ["train", "train+validation", "validation", "test"]
     dataset, info = tfds.load(name, split=split, data_dir=data_dir, with_info=True)
     return dataset, info
-
-
-def get_slc_dataset(root_dir='F:/1_cropped_numpy', image_type_dir='2_subband',
-                    image_type='subband', data_type='selected', batch_size=4,
-                    final_width=500, final_height=500):
-    image_dir = os.path.join(root_dir, image_type_dir)
-    file_list = os.listdir(image_dir)
-    image_path_list = [os.path.join(image_dir, x) for x in file_list if 'images' in x]
-    image_path_list = image_path_list[:3]
-    label_path_list = []
-    for image_path in image_path_list:
-        label_path_list.append(image_path.replace('images', 'labels'))
-    image_dataset = []
-    for image_path, label_path in zip(image_path_list, label_path_list):
-        cropped_images = np.load(image_path, allow_pickle=True)
-        cropped_labels = np.load(label_path, allow_pickle=True)
-        for image, label in zip(cropped_images, cropped_labels):
-            if len(label) == 0:
-                continue
-            img = np.array(image)[:, :, :3].astype('float32')
-            bboxes = np.array(label)[:, :4]
-            translated_bboxes = []
-            for ib, bbox in enumerate(bboxes):
-                x1 = (bbox[0]-bbox[2]/2)/img.shape[0]
-                y1 = (bbox[1]-bbox[3]/2)/img.shape[1]
-                x2 = (bbox[0]+bbox[2]/2)/img.shape[0]
-                y2 = (bbox[1]+bbox[3]/2)/img.shape[1]
-                translated_bboxes.append(np.asarray([y1, x1, y2, x2]).astype('float32'))
-            img = tf.image.convert_image_dtype(img, tf.float32)
-            img = tf.image.resize(img, (final_width, final_height))
-            image_dataset.append((img, tf.cast(translated_bboxes, dtype=tf.float32),
-                                  tf.cast(np.array(label)[:, 4], dtype=tf.int32)))
-
-    return image_dataset[:24]
-
 
 def get_total_item_size(info, split):
     """Get total item size for given split.
@@ -159,8 +117,7 @@ def get_custom_imgs(custom_image_path):
         break
     return img_paths
 
-
-def custom_data_generator(images, final_height, final_width):
+def custom_data_generator(img_paths, final_height, final_width):
     """Yielding custom entities as dataset.
     inputs:
         img_paths = custom image paths
@@ -171,9 +128,8 @@ def custom_data_generator(images, final_height, final_width):
         dummy_gt_boxes = (None, None)
         dummy_gt_labels = (None, )
     """
-    # for img_path in images:
-    #     image = Image.open(images)
-    for image in images:
+    for img_path in img_paths:
+        image = Image.open(img_path)
         resized_image = image.resize((final_width, final_height), Image.LANCZOS)
         img = np.array(resized_image)
         img = tf.image.convert_image_dtype(img, tf.float32)
@@ -191,7 +147,7 @@ def get_data_shapes():
     outputs:
         data shapes = output data shapes for (images, ground truth boxes, ground truth labels)
     """
-    return ([None, None, None], [None, None], [None, ])
+    return ([None, None, None], [None, None], [None,])
 
 def get_padding_values():
     """Generating padding values for missing values in batch for tensorflow datasets.

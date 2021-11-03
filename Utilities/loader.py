@@ -7,10 +7,20 @@ import h5py
 import spectral.io.envi as envi
 import pandas as pd
 
+data_type_order = {
+    'raw': 0,
+    'gray_scale_raw': 1,
+    'subband': 2
+}
 
-def get_dataset(dir='../data/resized_cropped_raw', prefix='cropped_resized_debug_raw', image_num=0):
-    images = np.load(os.path.join(dir, '{}_images_{}.npy'.format(prefix, image_num)))
-    labels = np.load(os.path.join(dir, '{}_labels_{}.npy'.format(prefix, image_num)), allow_pickle=True)
+
+def get_dataset(dir='F:/1_cropped_numpy', image_type='raw', data_type='selected', image_num=0):
+    images = np.load(os.path.join(dir,
+                                  '{}_{}'.format(data_type_order[image_type], image_type),
+                                  'cropped_{}_{}_images_{}.npy'.format(data_type, image_type, image_num)), allow_pickle=True)
+    labels = np.load(os.path.join(dir,
+                                  '{}_{}'.format(data_type_order[image_type], image_type),
+                                  'cropped_{}_{}_labels_{}.npy'.format(data_type, image_type, image_num)), allow_pickle=True)
     return images, labels
 
 

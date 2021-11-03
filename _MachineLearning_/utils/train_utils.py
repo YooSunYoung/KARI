@@ -1,37 +1,16 @@
 import tensorflow as tf
 import math
-import os
 from MachineLearning.utils import bbox_utils
 
 RPN = {
     "vgg16": {
-        "img_size": 500,
+        "img_size": 1024,
+        "channel_size": 3,
         "feature_map_shape": 31,
         "anchor_ratios": [1., 2., 1./2.],
-        "anchor_scales": [128, 256, 512],
-    },
-    "mobilenet_v2": {
-        "img_size": 500,
-        "feature_map_shape": 32,
-        "anchor_ratios": [1., 2., 1./2.],
-        "anchor_scales": [128, 256, 512],
+        "anchor_scales": [64, 128, 256],
     }
 }
-
-
-def set_gpu(gpu_num='0'):
-    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_num
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-      try:
-        # Currently, memory growth needs to be the same across GPUs
-        for gpu in gpus:
-          tf.config.experimental.set_memory_growth(gpu, True)
-        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-      except RuntimeError as e:
-        # Memory growth must be set before GPUs have been initialized
-        print(e)
 
 
 def get_hyper_params(backbone, **kwargs):
@@ -57,6 +36,7 @@ def get_hyper_params(backbone, **kwargs):
     hyper_params["anchor_count"] = len(hyper_params["anchor_ratios"]) * len(hyper_params["anchor_scales"])
     return hyper_params
 
+
 def get_step_size(total_items, batch_size):
     """Get step size for given total item size and batch size.
     inputs:
@@ -66,6 +46,7 @@ def get_step_size(total_items, batch_size):
         step_size = number of step size for model training
     """
     return math.ceil(total_items / batch_size)
+
 
 def randomly_select_xyz_mask(mask, select_xyz):
     """Selecting x, y, z number of True elements for corresponding batch and replacing others to False
@@ -98,8 +79,9 @@ def faster_rcnn_generator(dataset, anchors, hyper_params):
     while True:
         for image_data in dataset:
             img, gt_boxes, gt_labels = image_data
+            img = tf.map_fn(tf.abs, img) #####
             bbox_deltas, bbox_labels = calculate_rpn_actual_outputs(anchors, gt_boxes, gt_labels, hyper_params)
-            yield (img, gt_boxes, gt_labels, bbox_deltas, bbox_labels),
+            yield (img, gt_boxes, gt_labels, bbox_deltas, bbox_labels), ()
 
 
 def rpn_generator(dataset, anchors, hyper_params):
@@ -180,7 +162,6 @@ def calculate_rpn_actual_outputs(anchors, gt_boxes, gt_labels, hyper_params):
     #
     return bbox_deltas, bbox_labels
 
-
 def frcnn_cls_loss(*args):
     """Calculating faster rcnn class loss value.
     inputs:
@@ -214,6 +195,7 @@ def rpn_cls_loss(*args):
     output = tf.gather_nd(y_pred, indices)
     lf = tf.losses.BinaryCrossentropy()
     return lf(target, output)
+
 
 def reg_loss(*args):
     """Calculating rpn / faster rcnn regression loss value.

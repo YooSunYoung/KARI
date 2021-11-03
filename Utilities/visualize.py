@@ -1,7 +1,8 @@
 import numpy as np
 import cv2
 import os
-
+from random import random
+from AIFactoryDS.ImageUtilities import iou_x1_y1_x2_y2
 
 def draw_raw_image(image_path, label_path, predicted_labels=None):
     image = np.load(image_path)
@@ -33,19 +34,19 @@ def draw_cropped_images(target_dir='../data/cropped_samples',
         label_list = label_list.get('arr_0')
     image_number = cropped_image_path.split('_')[-1].split('.')[0]
     for i_data, (image, labels) in enumerate(zip(images, label_list)):
+        image = np.array(image)
         for label in labels:
-            x1y1 = (int(label[0]-label[2]/2), int(label[1]-label[2]/2))
-            x2y2 = (int(label[0]+label[2]/2), int(label[1]+label[2]/2))
-            # images[i_data] = cv2.rectangle(image, x1y1, x2y2, (255, 255, 255), 50)
+            x1y1 = [int(label[0]-label[2]/2), int(label[1]-label[2]/2)]
+            x2y2 = [int(label[0]+label[2]/2), int(label[1]+label[2]/2)]
+            image = cv2.rectangle(image, x1y1, x2y2, (255, 255, 255), 25)
+        images[i_data] = image
     if predicted_labels is not None:
         for i_data, (image, pred_labels) in enumerate(zip(images, predicted_labels)):
             for pred_label in pred_labels:
                 x1y1 = (pred_label[0]-pred_label[2]/2, pred_label[1]-pred_label[2]/2)
                 x2y2 = (pred_label[0]+pred_label[2]/2, pred_label[1]+pred_label[2]/2)
-                # images[i_data] = cv2.rectangle(image, x1y1, x2y2, (255, 0, 0), 2)
-
     for i_image, image in enumerate(images):
-        image = cv2.resize(image, dsize=(0, 0), fx=0.2, fy=0.2, interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, dsize=(0, 0), fx=0.6, fy=0.6, interpolation=cv2.INTER_LINEAR)
         image_path = os.path.join(target_dir, 'sample_{}_{}.png'.format(image_number, i_image))
         cv2.imwrite(image_path, image)
 
@@ -53,6 +54,6 @@ def draw_cropped_images(target_dir='../data/cropped_samples',
 if __name__ == "__main__":
     # draw_raw_image('../data/raw/raw_images_0.npy', '../data/raw/raw_labels_0.npy')
     # draw_cropped_images()
-    draw_cropped_images(target_dir='../data/resized_cropped_samples',
+    draw_cropped_images(target_dir='../data/resized_cropped_samples_backup',
                         cropped_image_path='../data/resized_cropped_raw/cropped_resized_debug_subband_images_0.npy',
                         cropped_label_path='../data/resized_cropped_raw/cropped_resized_debug_subband_labels_0.npy')

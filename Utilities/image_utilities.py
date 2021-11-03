@@ -18,7 +18,6 @@ def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=No
             return {"images": [[raw_image]], "offsets": [[(0, 0)]]}
     raw_image_x_size = raw_image.shape[1]
     raw_image_y_size = raw_image.shape[0]
-    raw_image_channel_size = raw_image.shape[2]
     target_x_size = target_size[0]
     target_y_size = target_size[1]
     if EVENLY_SPLIT:
@@ -41,7 +40,7 @@ def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=No
         num_rows = ceil((raw_image_y_size-target_y_size)/y_interval)+1
     left_upper_coordinates = []
     cropped_images = []
-    for i_row in tqdm(range(num_rows+1)):
+    for i_row in range(num_rows+1):
         row_coord = []
         row_image = []
         y_offset = i_row*y_interval
@@ -52,7 +51,10 @@ def split_2d_image(raw_image: np.ndarray, target_size: tuple, overlapped_size=No
             if i_col == num_cols:
                 x_offset = raw_image_x_size-target_x_size
             row_coord.append((x_offset, y_offset))
-            row_image.append(raw_image[y_offset:y_offset+target_y_size, x_offset:x_offset+target_x_size, :])
+            single_image = raw_image[y_offset:y_offset+target_y_size, x_offset:x_offset+target_x_size, :]
+            if single_image.shape[0] < target_y_size or single_image.shape[1] < target_x_size:
+                single_image = cv2.resize(single_image, (target_x_size, target_y_size))
+            row_image.append(single_image)
         left_upper_coordinates.append(row_coord)
         cropped_images.append(row_image)
     return {"images": cropped_images, "offsets": left_upper_coordinates}
@@ -70,35 +72,48 @@ def crop_image(large_image: np.ndarray, original_labels: np.ndarray,
     """
     target_size = np.array([cropped_image_height, cropped_image_width])
     split_images = split_2d_image(large_image, target_size)
-    cropped_images = split_images['images']
+    cropped_images = []
+    for image_row in split_images['images']:
+        cropped_images.extend(image_row)
     labels = []
+    offsets = []
     for i_row, offset_row in tqdm(enumerate(split_images['offsets'])):
         row_labels = []
         for offset in offset_row:
             image_labels = []
-            for x, y, obj_size, cls in original_labels:
+            for x, y, obj_width, obj_height, cls in original_labels:
                 if (offset[0] <= x <= offset[0] + cropped_image_width) \
                         and (offset[1] <= y <= offset[1] + cropped_image_height):
                     x -= offset[0]
                     y -= offset[1]
-                    image_labels.append((x, y, obj_size, obj_size, cls))
+                    image_labels.append((x, y, obj_width, obj_height, cls))
             row_labels.append(image_labels)
+        offsets.extend(offset_row)
         labels.extend(row_labels)
-    return cropped_images, labels, split_images['offsets']
+    return cropped_images, labels, offsets
 
 
 if __name__ == "__main__":
     # sample_large_image = cv2.imread('./sample.jpeg')
-    sample_large_image = np.random.rand(3200, 4500, 3)*100/255
+    sample_large_image = np.load('F:/0_raw_numpy/selected_gray_scale_raw_images_3.npy', allow_pickle=True)
+    sample_large_label = np.load('F:/0_raw_numpy/selected_gray_scale_raw_labels_3.npy', allow_pickle=True)
+
+    sample_large_image = np.array(sample_large_image, dtype=np.uint8)
+    for label in sample_large_label:
+        x1y1 = [int(label[0]-label[2]/2), int(label[1]-label[3]/2)]
+        x2y2 = [int(label[0]+label[2]/2), int(label[1]+label[3]/2)]
+        sample_large_image = cv2.rectangle(sample_large_image, x1y1, x2y2, (255, 255, 255), 20)
+    # sample_large_image = np.random.rand(3200, 4500, 3)*100/255
     row_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-    target_size = np.array([512, 512])
-    overlap_size = np.array([30, 50])
-    split_images = split_2d_image(sample_large_image, target_size, overlap_size)
+    target_size = np.array([2048, 2048])
+    # overlap_size = np.array([10, 50])
+    split_images = split_2d_image(sample_large_image, target_size)
     for i_row, offset_row in enumerate(split_images['offsets']):
         for offset in offset_row:
             offset = np.array(offset)
-            sample_large_image = cv2.rectangle(sample_large_image, offset, offset + target_size,
-                                               row_colors[i_row % 3], 2)
-    sample_large_image = cv2.resize(sample_large_image, dsize=(0, 0), fx=0.25, fy=0.25, interpolation=cv2.INTER_LINEAR)
+            sample_large_image = cv2.rectangle(sample_large_image,
+                                               offset, offset + target_size, row_colors[i_row % 3], 20)
+    sample_large_image = cv2.resize(sample_large_image, dsize=(0, 0), fx=0.1, fy=0.1, interpolation=cv2.INTER_LINEAR)
     cv2.imshow("sample", sample_large_image)
+    cv2.imwrite('sample.png', sample_large_image)
     cv2.waitKey(0)
