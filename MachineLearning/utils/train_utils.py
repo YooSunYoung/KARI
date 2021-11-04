@@ -7,14 +7,8 @@ RPN = {
     "vgg16": {
         "img_size": 500,
         "feature_map_shape": 31,
-        "anchor_ratios": [1., 2., 1./2.],
-        "anchor_scales": [128, 256, 512],
-    },
-    "mobilenet_v2": {
-        "img_size": 500,
-        "feature_map_shape": 32,
-        "anchor_ratios": [1., 2., 1./2.],
-        "anchor_scales": [128, 256, 512],
+        "anchor_ratios": [1., 1.5, 1./1.5],
+        "anchor_scales": [8, 16, 32, 64],
     }
 }
 
@@ -45,10 +39,10 @@ def get_hyper_params(backbone, **kwargs):
     hyper_params["pre_nms_topn"] = 6000
     hyper_params["train_nms_topn"] = 1500
     hyper_params["test_nms_topn"] = 300
-    hyper_params["nms_iou_threshold"] = 0.7
-    hyper_params["total_pos_bboxes"] = 128
-    hyper_params["total_neg_bboxes"] = 128
-    hyper_params["pooling_size"] = (7, 7)
+    hyper_params["nms_iou_threshold"] = 0.2
+    hyper_params["total_pos_bboxes"] = 64
+    hyper_params["total_neg_bboxes"] = 64
+    hyper_params["pooling_size"] = (4, 4)
     hyper_params["variances"] = [0.1, 0.1, 0.2, 0.2]
     for key, value in kwargs.items():
         if key in hyper_params and value:
@@ -65,7 +59,8 @@ def get_step_size(total_items, batch_size):
     outputs:
         step_size = number of step size for model training
     """
-    return math.ceil(total_items / batch_size)
+    return math.floor(total_items / batch_size)
+
 
 def randomly_select_xyz_mask(mask, select_xyz):
     """Selecting x, y, z number of True elements for corresponding batch and replacing others to False
@@ -231,7 +226,7 @@ def reg_loss(*args):
     loss_for_all = loss_fn(y_true, y_pred)
     loss_for_all = tf.reduce_sum(loss_for_all, axis=-1)
     #
-    pos_cond = tf.reduce_any(tf.not_equal(y_true, tf.constant(0.0)), axis=-1)
+    pos_cond = tf.reduce_any(tf.less_equal(y_true, tf.constant(0.0)), axis=-1)
     pos_mask = tf.cast(pos_cond, dtype=tf.float32)
     #
     loc_loss = tf.reduce_sum(pos_mask * loss_for_all)
