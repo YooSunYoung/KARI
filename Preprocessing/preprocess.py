@@ -33,9 +33,10 @@ def save_raw_image_to_numpy(directory_structure: dict, debug=False, target_dir='
         os.mkdir(target_dir)
     for ir, region in enumerate(directory_structure):
         for ip, period in enumerate(directory_structure[region]):
+            directory_structure[region][period]['image_id'] = num_image
             target_images_path = os.path.join(target_dir, '{}_images_{}.npy'.format(target_prefix, num_image))
             target_labels_path = os.path.join(target_dir, '{}_labels_{}.npy'.format(target_prefix, num_image))
-            if os.path.exists(target_labels_path) or 'RAW' not in directory_structure[region][period]:
+            if os.path.exists(target_labels_path) or 'TARGET_CSV' not in directory_structure[region][period]:
                 num_image += 1
                 continue
             raw = directory_structure[region][period]['RAW']
@@ -58,6 +59,7 @@ def save_raw_image_to_numpy(directory_structure: dict, debug=False, target_dir='
             num_image += 1
             if debug:
                 break
+    return directory_structure
 
 
 def save_gray_scale_raw_image_to_numpy(directory_structure: dict, debug=False, target_dir='../data/raw/', target_prefix='raw'):
@@ -70,9 +72,10 @@ def save_gray_scale_raw_image_to_numpy(directory_structure: dict, debug=False, t
 
     for ir, region in enumerate(directory_structure):
         for ip, period in enumerate(directory_structure[region]):
+            directory_structure[region][period]['image_id'] = num_image
             target_images_path = os.path.join(target_dir, '{}_images_{}.npy'.format(target_prefix, num_image))
             target_labels_path = os.path.join(target_dir, '{}_labels_{}.npy'.format(target_prefix, num_image))
-            if os.path.exists(target_images_path) or 'RAW' not in directory_structure[region][period]:
+            if os.path.exists(target_images_path) or 'TARGET_CSV' not in directory_structure[region][period]:
                 num_image += 1
                 continue
             raw = directory_structure[region][period]['RAW']
@@ -92,6 +95,7 @@ def save_gray_scale_raw_image_to_numpy(directory_structure: dict, debug=False, t
             num_image += 1
             if debug:
                 break
+    return directory_structure
 
 
 def save_full_band_image_to_numpy(directory_structure, debug=False, target_dir='../data/raw/', target_prefix='subband'):
@@ -100,9 +104,12 @@ def save_full_band_image_to_numpy(directory_structure, debug=False, target_dir='
         os.mkdir(target_dir)
     for ir, region in enumerate(directory_structure):
         for ip, period in low_tq(enumerate(directory_structure[region])):
+            directory_structure[region][period]['image_id'] = num_image
             target_images_path = os.path.join(target_dir, '{}_images_{}.npy'.format(target_prefix, num_image))
             target_labels_path = os.path.join(target_dir, '{}_labels_{}.npy'.format(target_prefix, num_image))
-            if os.path.exists(target_images_path) or 'SUB_BAND_SLC_HEADER' not in directory_structure[region][period]:
+            if os.path.exists(target_images_path) or \
+                    'TARGET_CSV' not in directory_structure[region][period] or \
+                    'SUB_BAND_SLC_HEADER' not in directory_structure[region][period]:
                 num_image += 1
                 continue
             sub_slc = directory_structure[region][period]['SUB_BAND_SLC_HEADER']
@@ -117,18 +124,19 @@ def save_full_band_image_to_numpy(directory_structure, debug=False, target_dir='
             num_image += 1
             if debug:
                 break
+    return directory_structure
 
 
 def save_images_to_numpy(dir_structure, data_type, image_type, debug=False):
     target_prefix = '{}_{}'.format(data_type, image_type)
     target_dir = 'F:/0_raw_numpy/{}_{}/'.format(iit, image_type)
     if image_type == IMAGETYPE.RAW:
-        save_raw_image_to_numpy(dir_structure, target_prefix=target_prefix, target_dir=target_dir, debug=debug)
+        dir_structure = save_raw_image_to_numpy(dir_structure, target_prefix=target_prefix, target_dir=target_dir, debug=debug)
     elif image_type == IMAGETYPE.GRAYSCALE_RAW:
-        save_gray_scale_raw_image_to_numpy(dir_structure, target_prefix=target_prefix, target_dir=target_dir, debug=debug)
+        dir_structure = save_gray_scale_raw_image_to_numpy(dir_structure, target_prefix=target_prefix, target_dir=target_dir, debug=debug)
     elif image_type == IMAGETYPE.SUBBAND:
-        save_full_band_image_to_numpy(dir_structure, target_prefix=target_prefix, target_dir=target_dir, debug=debug)
-
+        dir_structure = save_full_band_image_to_numpy(dir_structure, target_prefix=target_prefix, target_dir=target_dir, debug=debug)
+    return dir_structure
 
 large_images_tq = partial(tqdm, position=0, leave=True)
 
@@ -141,8 +149,8 @@ def crop_raw_image(raw_image_path=None, raw_label_path=None, debug=False,
         prefix = 'debug_raw'
     image_number = raw_label_path.split('_')[-1].split('.')[0]
     image_path = os.path.join(target_dir, 'cropped_{}_images_{}.npy'.format(prefix, image_number))
-    label_path = os.path.join(target_dir, 'cropped_{}_labels_{}.npy'.format(prefix, image_number))
-    offsets_path = os.path.join(target_dir, 'cropped_{}_offsets_{}.npy'.format(prefix, image_number))
+    label_path = image_path.replace('images', 'labels')
+    offsets_path = image_path.replace('images', 'offsets')
     if os.path.exists(image_path) and os.path.exists(label_path) and os.path.exists(offsets_path):
         return True
     raw_img_array = np.load(raw_image_path, allow_pickle=True)
@@ -158,45 +166,15 @@ def crop_raw_image(raw_image_path=None, raw_label_path=None, debug=False,
     return True
 
 
-def resize_cropped_images(cropped_image_path='../data/cropped_raw/cropped_debug_raw_images_0.npz',
-                          cropped_label_path='../data/cropped_raw/cropped_debug_raw_labels_0.npz',
-                          target_width=800, target_height=800,
-                          target_dir='../data/resized_cropped_raw/',
-                          prefix='debug_raw', debug=False):
-    cropped_images = np.load(cropped_image_path, allow_pickle=True)
-    cropped_images = cropped_images.get('arr_0')
-    resized_images = []
-    cropped_label_list = np.load(cropped_label_path, allow_pickle=True)
-    cropped_label_list = cropped_label_list.get('arr_0')
-    file_number = cropped_image_path.split('_')[-1].split('.')[0]
-    for i_data, (image, labels) in tqdm(enumerate(zip(cropped_images, cropped_label_list))):
-        width = image.shape[0]
-        height = image.shape[1]
-        width_ratio = target_width / width
-        height_ratio = target_height / height
-        # max_component = np.max(image)
-        image = cv2.resize(image, dsize=(target_width, target_height), interpolation=cv2.INTER_LINEAR)
-        resized_images.append(image)
-        for i_label, label in enumerate(labels):
-            label = [label[0] * width_ratio, label[1] * height_ratio,
-                     label[2] * width_ratio, label[3] * height_ratio, label[4]]
-            cropped_label_list[i_data][i_label] = label
-    resized_images = np.array(resized_images)
-    image_path = os.path.join(target_dir, 'cropped_resized_{}_images_{}.npy'.format(prefix, file_number))
-    label_path = os.path.join(target_dir, 'cropped_resized_{}_labels_{}.npy'.format(prefix, file_number))
-    np.save(image_path, resized_images)
-    np.save(label_path, cropped_label_list)
-
-
 if __name__ == '__main__':
 
-    stage = STAGE.IMAGES_TO_NUMPY
+    stage = STAGE.PARSE_DIRECTORY_STRUCTURE
 
     if stage == STAGE.PARSE_DIRECTORY_STRUCTURE:
         # save directory structure of selected images
         selected_region_period_dirs = get_dirs(root_dir='D:/20210517', debug=False)
         selected_region_period_dirs = get_target_files(selected_region_period_dirs,
-                                                       removed_dir_path='../data/directory_structure/{}_removed.json')
+                                                       removed_dir_path='../data/directory_structure/selected_removed.json')
         with open('../data/directory_structure/selected.json', 'w') as f:
             json.dump(selected_region_period_dirs, f, indent='\t')
         # save directory structure of unselected images
@@ -210,7 +188,9 @@ if __name__ == '__main__':
         for idt, dt in enumerate([DATATYPE.SELECTED, DATATYPE.UNSELECTED]):
             dir_structure = get_directory_structure(json_path='../data/directory_structure/{}.json'.format(dt))
             for iit, it in enumerate([IMAGETYPE.RAW, IMAGETYPE.GRAYSCALE_RAW, IMAGETYPE.SUBBAND]):
-                save_images_to_numpy(dir_structure, data_type=dt, image_type=it, debug=False)
+                dir_structure = save_images_to_numpy(dir_structure, data_type=dt, image_type=it, debug=False)
+            with open('../data/directory_structure/{}.json'.format(dt), 'w') as f:
+                json.dump(dir_structure, f, indent='\t')
     elif stage == STAGE.CROP_IMAGES:
         raw_files_directory, raw_file_prefix, raw_file_label_prefix, raw_file_image_prefix = None, None, None, None
         # save raw images from unselected group into numpy
