@@ -1,6 +1,5 @@
 import os
 import tensorflow as tf
-from tensorflow.python.data import Dataset
 import tensorflow_datasets as tfds
 from PIL import Image
 import numpy as np
@@ -89,13 +88,13 @@ def get_dataset(name, split, data_dir="~/tensorflow_datasets"):
     return dataset, info
 
 
-def get_slc_dataset(root_dir='F:/1_cropped_numpy', image_type_dir='2_subband',
+def get_raw_slc_dataset(root_dir='F:/1_cropped_numpy', image_type_dir='2_subband',
                     image_type='subband', data_type='selected', batch_size=4,
                     final_width=500, final_height=500):
     image_dir = os.path.join(root_dir, image_type_dir)
     file_list = os.listdir(image_dir)
     image_path_list = [os.path.join(image_dir, x) for x in file_list if 'images' in x]
-    image_path_list = image_path_list[:3]
+    image_path_list = image_path_list[:2]
     label_path_list = []
     for image_path in image_path_list:
         label_path_list.append(image_path.replace('images', 'labels'))
@@ -108,19 +107,67 @@ def get_slc_dataset(root_dir='F:/1_cropped_numpy', image_type_dir='2_subband',
                 continue
             img = np.array(image)[:, :, :3].astype('float32')
             bboxes = np.array(label)[:, :4]
+            clses = np.array(label)[:, 4]
             translated_bboxes = []
-            for ib, bbox in enumerate(bboxes):
-                x1 = (bbox[0]-bbox[2]/2)/img.shape[0]
-                y1 = (bbox[1]-bbox[3]/2)/img.shape[1]
-                x2 = (bbox[0]+bbox[2]/2)/img.shape[0]
-                y2 = (bbox[1]+bbox[3]/2)/img.shape[1]
-                translated_bboxes.append(np.asarray([y1, x1, y2, x2]).astype('float32'))
+            translated_clses = []
+            for ib, (bbox, cls) in enumerate(zip(bboxes, clses)):
+                if cls >= 3 and bbox[2] > 50:
+                    x1 = (bbox[0]-bbox[2]/2)/img.shape[0]
+                    y1 = (bbox[1]-bbox[3]/2)/img.shape[1]
+                    x2 = (bbox[0]+bbox[2]/2)/img.shape[0]
+                    y2 = (bbox[1]+bbox[3]/2)/img.shape[1]
+                    translated_bboxes.append(np.asarray([y1, x1, y2, x2]).astype('float32'))
+                    translated_clses.append(1)
+            if len(translated_bboxes) == 0:
+                continue
             img = tf.image.convert_image_dtype(img, tf.float32)
             img = tf.image.resize(img, (final_width, final_height))
             image_dataset.append((img, tf.cast(translated_bboxes, dtype=tf.float32),
-                                  tf.cast(np.array(label)[:, 4], dtype=tf.int32)))
+                                  tf.cast(translated_clses, dtype=tf.int32)))
 
-    return image_dataset[:24]
+    return image_dataset
+
+
+def get_slc_dataset(root_dir='F:/1_cropped_numpy', image_type_dir='2_subband',
+                    image_type='subband', data_type='selected', batch_size=4,
+                    final_width=500, final_height=500):
+    image_dir = os.path.join(root_dir, image_type_dir)
+    file_list = os.listdir(image_dir)
+    image_path_list = [os.path.join(image_dir, x) for x in file_list if 'images' in x]
+    image_path_list = image_path_list[:1]
+    label_path_list = []
+    for image_path in image_path_list:
+        label_path_list.append(image_path.replace('images', 'labels'))
+    image_dataset = []
+    for image_path, label_path in zip(image_path_list, label_path_list):
+        cropped_images = np.load(image_path, allow_pickle=True)
+        cropped_labels = np.load(label_path, allow_pickle=True)
+        for image, label in zip(cropped_images, cropped_labels):
+            if len(label) == 0:
+                continue
+            img = np.array(image)[:, :, :3].astype('float32')
+            bboxes = np.array(label)[:, :4]
+            clses = np.array(label)[:, 4]
+            translated_bboxes = []
+            translated_clses = []
+            for ib, (bbox, cls) in enumerate(zip(bboxes, clses)):
+                if cls >= 3 and bbox[2] > 30:
+                    x1 = (bbox[0]-bbox[2]/2)/img.shape[0]
+                    y1 = (bbox[1]-bbox[3]/2)/img.shape[1]
+                    x2 = (bbox[0]+bbox[2]/2)/img.shape[0]
+                    y2 = (bbox[1]+bbox[3]/2)/img.shape[1]
+                    translated_bboxes.append(np.asarray([y1, x1, y2, x2]).astype('float32'))
+                    translated_clses.append(1)
+            if len(translated_bboxes) == 0:
+                continue
+            img = tf.image.convert_image_dtype(img, tf.float32)
+            img = tf.image.per_image_standardization(
+                tf.image.adjust_contrast(
+                        tf.image.resize(img, (final_width, final_height)), 0.7))
+            image_dataset.append((img, tf.cast(translated_bboxes, dtype=tf.float32),
+                                  tf.cast(translated_clses, dtype=tf.int32)))
+
+    return image_dataset
 
 
 def get_total_item_size(info, split):
